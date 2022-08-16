@@ -1,9 +1,24 @@
+variables.json
 *.tfstate
 *.tfstate.*.backup
 *.tfstate.backup
 *.tfvars
+tfplan
 .terraform/
-variables.json
+.terraform.lock.hcl
+backend.conf
+*.retry
+jdauphant.nginx
+vault.key
+# Vagrant & molecule
+.vagrant/
+*.log
 *.pyc
+.molecule
+.cache
+.pytest_cache
+tls.*
+
+geerlingguy.*/
 .env
-.git
+build_info.txt
