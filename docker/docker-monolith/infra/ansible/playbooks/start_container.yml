@@ -1,0 +1,13 @@
+---
+- name: Start container
+  hosts: all
+  become: true
+  tasks:
+    - name: start reddit
+      docker_container:
+        name: reddit
+        state: started
+        restart: yes
+        image: ayden1st/otus-reddit:1.0
+        ports:
+          - "80:9292"

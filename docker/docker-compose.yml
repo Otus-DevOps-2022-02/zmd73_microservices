@@ -1,0 +1,100 @@
+version: '3.3'
+services:
+
+  post_db:
+    image: mongo:${DB_VERSION}
+    volumes:
+      - post_db:/data/db
+    networks:
+      back_net:
+        aliases:
+          - post_db
+          - comment_db
+
+  ui:
+    #build: ./ui
+    image: ${DOCKER_USERNAME}/ui:${UI_VERSION}
+    ports:
+      - ${PORT}:9292/tcp
+    networks:
+      - front_net
+  post:
+    #build: ./post-py
+    image: ${DOCKER_USERNAME}/post:${POST_VERSION}
+    networks:
+      back_net:
+        aliases:
+          - post
+      front_net:
+        aliases:
+          - post
+
+  comment:
+    #build: ./comment
+    image: ${DOCKER_USERNAME}/comment:${COMMENT_VERSION}
+    networks:
+      back_net:
+        aliases:
+          - comment
+      front_net:
+        aliases:
+          - comment
+
+  prometheus:
+    image: ${DOCKER_USERNAME}/prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
+    command: # Передаем доп параметры в командной строке
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=1d'
+    networks:
+      - back_net
+      - front_net
+      - host
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    user: root
+    volumes:
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+    networks:
+      - host
+
+  mongo-exporter:
+    image: percona/mongodb_exporter:0.32.0
+    networks:
+      - back_net
+    command:
+      - '--mongodb.uri=mongodb://post_db:27017'
+      - '--collect-all'
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.21.0
+    user: root
+    networks:
+      - back_net
+      - front_net
+
+volumes:
+  post_db:
+  prometheus_data:
+
+networks:
+  back_net:
+    ipam:
+      config:
+        - subnet: 10.0.2.0/24
+  front_net:
+    ipam:
+      config:
+        - subnet: 10.0.1.0/24
+  host:

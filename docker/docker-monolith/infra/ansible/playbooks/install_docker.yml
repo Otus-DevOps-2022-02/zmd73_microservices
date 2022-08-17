@@ -1,0 +1,25 @@
+---
+- name: Install Docker
+  hosts: all
+  become: true
+  tasks:
+    - name: role geerlingguy.docker
+      when: ansible_facts['lsb']['release'] >= "18.04"
+      include_role:
+        name: geerlingguy.docker
+
+    - name: install dependencies
+      apt:
+        name: python3-pip
+        update_cache: true
+
+    - name: install dependencies
+      pip:
+        name: docker
+
+    - name: start reddit
+      docker_container:
+        name: reddit
+        state: started
+        restart: yes
+        image: ayden1st/otus-reddit:1.0

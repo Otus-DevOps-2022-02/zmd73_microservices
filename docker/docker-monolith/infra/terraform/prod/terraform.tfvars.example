@@ -1,0 +1,8 @@
+cloud_id                 = "11111111111111111111"
+folder_id                = "11111111111111111111"
+zone                     = "ru-central1-a"
+public_key_path          = "~/.ssh/rsa.pub"
+private_key_path         = "~/.ssh/rsa"
+service_account_key_file = "~/key.json"
+docker_disk_folder       = "11111111111111111111"
+docker_disk_image        = "docker-base"
