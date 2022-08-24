@@ -1,118 +1,226 @@
-# zmd73_microservices
-zmd73 microservices repository
+# ayden1st_microservices
 
-# Выполнено ДЗ gitlab-ci-1. Устройство Gitlab CI. Построение процесса непрерывной поставки
-
-1.Создана ветка gitlab-ci-1
-
-2.Создаем новую ВМ
+### Лекция 15
+#### 15.1 Работа с контейнерами
+Создание и запуск контейнера:
 ```
-yc compute instance create \
---name gitlab-ci \
---zone ru-central1-a \
---network-interface subnet-name=default-ru-central1-a,nat-ip-version=ipv4 \
---create-boot-disk image-folder-id=standard-images,image-family=ubuntu-1804-lts,size=50 \
---ssh-key ~/.ssh/id_rsa.pub
+docker run <image>
 ```
-3.Устанавливаем Docker
-
-4.Создаем необходимые директории м docker-compose файл
+Список запущенных контейнеров:
 ```
-mkdir -p /srv/gitlab/config /srv/gitlab/data /srv/gitlab/logs
-cd /srv/gitlab
-touch docker-compose.yml
+docker ps
 ```
+Запуск процесса в контейнере:
 ```
-web:
-  image: 'gitlab/gitlab-ce:latest'
-  restart: always
-  hostname: 'gitlab.example.com'
-  environment:
-    GITLAB_OMNIBUS_CONFIG: |
-      external_url 'http://<YOUR-VM-IP>'
-  ports:
-    - '80:80'
-    - '443:443'
-    - '2222:22'
-  volumes:
-    - '/srv/gitlab/config:/etc/gitlab'
-    - '/srv/gitlab/logs:/var/log/gitlab'
-    - '/srv/gitlab/data:/var/opt/gitlab'
+docker exec -it <u_container_id> bash
 ```
-https://docs.gitlab.com/ee/install/docker.html
-
-5.В той же директории, где docker-compose.yml ( /srv/gitlab ) запускаем docker compose up -d
-
-6.Заходим, проверяем
-
-7.cd /etc/gitlab
-gitlab-rake "gitlab:password:reset[root]"
-
-8.Создаем группу и тестовый проект
-
-9.Добавляем ещё один remote к своему локальному infra-репозиторию
+Создание image из работающего контейнера:
 ```
-git checkout -b gitlab-ci-1
-git remote add gitlab ssh://git@<your-vm-ip>:2222/homework/example.git
-git push gitlab gitlab-ci-1
+docker commit <u_container_id> yourname/ubuntu-tmp-file
 ```
-10.Создаем в корне репозитория .gitlab-ci.yml следующего содержания
+Удаление контейнеров и образов:
 ```
-stages:
-  - build
-  - test
-  - deploy
+docker rm $(docker ps -a -q) # удалит все незапущенные контейнеры
 
-build_job:
-  stage: build
-  script:
-    - echo 'Building'
-
-test_unit_job:
-  stage: test
-  script:
-    - echo 'Testing 1'
-
-test_integration_job:
-  stage: test
-  script:
-    - echo 'Testing 2'
-
-deploy_job:
-  stage: deploy
-  script:
-    - echo 'Deploy'
+docker rmi $(docker images -q)
 ```
-11.Пушим и проверяем статус pipeline
+#### 15.2 Задание со *
+Docker image - это неизменяемый файл, содержащий исходный код, библиотеки, зависимости, инструменты и другие файлы, необходимые для запуска приложения. Docker container - это экземпляр image, содержащий новый слой доступный для записи и ряд настроек характерных для работающей машины, например NetworkSettings.
 
-12.Получаем token Settings -> CI/CD -> Pipelines -> Runners
-
-13. На сервере, где работает Gitlab CI, выполняем команду:
+### Лекция 16
+#### 16.1 Запуск контейнера на удаленной машине
+> **WARNING**:Docker-machine deprecated.
+Установка docker-machine на linux:
 ```
-docker run -d --name gitlab-runner --restart always -v /srv/gitlab-runner/config:/etc/gitlab-runner -v /var/run/docker.sock:/var/run/docker.sock gitlab/gitlab-runner:latest
+curl -L https://github.com/docker/machine/releases/download/v0.16.2/docker-machine-`uname -s`-`uname -m` >/tmp/docker-machine && chmod +x /tmp/docker-machine && sudo cp /tmp/docker-machine /usr/local/bin/docker-machine
+```
+Установка docker на удаленный хост:
+```
+docker-machine create \
+--driver generic \
+--generic-ip-address=<external_ip> \
+--generic-ssh-user yc-user \
+--generic-ssh-key ~/.ssh/appuser.pub \
+docker-host
+```
+Сборка и запуск образа на удаленном хосте:
+```
+eval $(docker-machine env docker-host)
+cd docker-momolith
+docker build -t reddit:latest .
+docker run --name reddit -d --network=host reddit:latest
+```
+Загрузка образа в DockerHub
+```
+docker login
+docker tag reddit:latest <your-login>/otus-reddit:1.0
+docker push <your-login>/otus-reddit:1.0
 ```
 
-14.Регистрируем runner.
+#### 16.2 Задание со *
+Для использования провайдеров с зеркал нужно создать файл `vi ~/.terraformrc` и записать:
 ```
-docker exec -it gitlab-runner gitlab-runner register \
---url http://<your-ip>/ \
+provider_installation {
+  network_mirror {
+    url = "https://terraform-mirror.yandexcloud.net/"
+    include = ["registry.terraform.io/*/*"]
+  }
+  direct {
+    exclude = ["registry.terraform.io/*/*"]
+  }
+}
+```
+Установка роли для установки Docker:
+```
+cd docker-monolith/infra/ansible
+ansible-galaxy install -r requrements.yml -p ./roles
+```
+Создание образа с установленным докером:
+```
+cd ../packer
+packer build -var-file=variables.json docker.json
+```
+Создание ВМ с использованием образа (колличество ВМ можно менять параметром **count_vm**):
+```
+cd docker-monolith/infra/terraform
+terraform init
+terraform apply
+cd ./prod
+terraform init -backend-config=./backend.conf
+terraform apply
+```
+Запуск конетейнера на ВМ:
+```
+ansible-playbook playbooks/start_container.yml
+```
+### Лекция 17
+#### 17.1 Создание и запуск связанных контейнеров
+Build, создание сети reddit и запуск связанных контейнеров:
+```
+docker build -t ayden1st/post:1.0 ./post-py
+docker build -t ayden1st/comment:1.0 ./comment
+docker build -t ayden1st/ui:1.0 ./ui
+docker pull mongo:latest
+docker network create reddit
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post ayden1st/post:1.0
+docker run -d --network=reddit --network-alias=comment ayden1st/comment:1.0
+docker run -d --network=reddit -p 9292:9292 ayden1st/ui:1.0
+```
+#### 17.2 Задание со *
+Запуск контейнеров с параметрами env, переопредящие параметры заданные в Dockerfile:
+```
+docker run -d --network=reddit --network-alias=post_db_new --network-alias=comment_db_new mongo:latest
+docker run -d --network=reddit --network-alias=post_new \
+  -e POST_DATABASE_HOST='post_db_new' \
+  ayden1st/post:1.0
+docker run -d --network=reddit --network-alias=comment_new \
+  -e COMMENT_DATABASE_HOST='comment_db_new' \
+  ayden1st/comment:1.0
+docker run -d --network=reddit -p 9292:9292 \
+  -e POST_SERVICE_HOST='post_new' \
+  -e COMMENT_SERVICE_HOST='comment_new' \
+  ayden1st/ui:1.0
+```
+#### 17.3 Задание со *
+Оптимизированные образы в файлах Dockerfile.1
+* Использованы alpine образы
+* Очищается кеш установщиков pip, apk
+```
+REPOSITORY         TAG                IMAGE ID       CREATED              SIZE
+ayden1st/ui        3.0                db2ad76145e1   About a minute ago   91.6MB
+ayden1st/post      2.0                ca124214c3be   19 minutes ago       64.8MB
+ayden1st/comment   2.0                9c9df1e44931   44 minutes ago       89MB
+ayden1st/ui        2.0                d022e4e0dea8   About an hour ago    432MB
+ayden1st/post      1.0                12a27f67be5d   2 hours ago          121MB
+ayden1st/ui        1.0                cfbc38f21173   3 hours ago          762MB
+ayden1st/comment   1.0                a4b332da83e1   3 hours ago          759MB
+```
+Build и запуск коннтейнеров с оптимизированными образами:
+```
+docker build -t ayden1st/post:2.0 -f ./post-py/Dockerfile.1 ./post-py
+docker build -t ayden1st/comment:2.0 -f ./comment/Dockerfile.1 ./comment
+docker build -t ayden1st/ui:3.0 -f ./ui/Dockerfile.1 ./ui
+docker run -d --network=reddit --network-alias=post_db \
+--network-alias=comment_db -v reddit_db:/data/db mongo:latest
+docker run -d --network=reddit --network-alias=post ayden1st/post:2.0
+docker run -d --network=reddit --network-alias=comment ayden1st/comment:2.0
+docker run -d --network=reddit -p 9292:9292 ayden1st/ui:3.0
+```
+#### 17.4 Использование volume
+Создание volume и запуск контейнеров с его использованием:
+```
+docker volume create reddit_db
+docker run -d --network=reddit --network-alias=post_db \
+--network-alias=comment_db -v reddit_db:/data/db mongo:latest
+docker run -d --network=reddit --network-alias=post ayden1st/post:1.0
+docker run -d --network=reddit --network-alias=comment ayden1st/comment:1.0
+docker run -d --network=reddit -p 9292:9292 ayden1st/ui:2.0
+```
+Остановка и удаление контейнеров:
+```
+docker kill $(docker ps -q)
+docker container prune
+```
+### Лекция 18
+#### 18.1 Docker и сети
+Запуск контейнеров с несколькими сетями:
+```
+docker network create back_net --subnet=10.0.2.0/24
+docker network create front_net --subnet=10.0.1.0/24
+docker run -d --network=front_net -p 9292:9292 --name ui ayden1st/ui:1.0
+docker run -d --network=back_net --name comment ayden1st/comment:1.0
+docker run -d --network=back_net --name post ayden1st/post:1.0
+docker run -d --network=back_net --name mongo_db \
+  --network-alias=post_db --network-alias=comment_db mongo:latest
+docker network connect front_net post
+docker network connect front_net comment
+```
+#### 18.2 Docker-compose
+Добавлены переменные окружения:
+* Логин пользователя в DockerHub
+* Порт приложения
+* Версия приложений
+* Имя проекта
+Базовое имя проекта в docker-compose берется из имени папки в которой находится файл docker-compose. Изменить можно задав переменную env COMPOSE_PROJECT_NAME или запустив docker-compose с флагом -p <NAME>.
+#### 18.3 Задание со *
+Файл docker-compose.override.yml добавлены:
+* Монтирование папки приложения в контейнер (работает на локальной машине)
+* Добавлена опция command переопределяющая запуск puma с отличными от образа дополнительными параметрами `--debug -w 2`
+### Лекция 20
+#### 20.1 Установка gitlab-ce в контейнере
+Созданы манифест terraform для развертывания ВМ и плейбук ansible для установки docker и запуска контейнеров gitlab-ce, gitlab-runner. Пароль root хранится в контейнере:
+```
+sudo docker exec -it gitlab grep 'Password:' /etc/gitlab/initial_root_password
+```
+Для регистрации runner нужно запустить комманду в контейнере:
+```
+sudo docker exec -it gitlab-runner gitlab-runner register \
+--url http://<external_ip>/ \
 --non-interactive \
 --locked=false \
 --name DockerRunner \
 --executor docker \
 --docker-image alpine:latest \
---registration-token <your-token> \
+--registration-token <TOKEN> \
 --tag-list "linux,xenial,ubuntu,docker" \
 --run-untagged
 ```
-
-15.Push с тэгами
+#### 20.1 Задание со *
+Установка gitlab-ce и gitlab-runner:
 ```
-git commit -am '#4 add logout button to profile page'
-git tag 2.4.10
-git push gitlab gitlab-ci-1 --tags
+cd gitlab-ci/infra/terraform
+terraform init
+terraform apply
+cd ../ansible
+ansible-playbook playbook/install_docker.yml
 ```
-
+Для сборки образа docker, runner должен иметь доступ к docker.socket:
+```
+docker exec -it gitlab-runner gitlab-runner register --url http://<external_ip>/ --non-interactive --locked=false --name DockerRunner --executor docker --docker-image alpine:latest --registration-token <TOKEN> --tag-list "linux,xenial,ubuntu,docker" --run-untagged --docker-volumes "/var/run/docker.sock:/var/run/docker.sock"
+```
+В пайплайн добавлены build_container_reddit для сборки образа, branch_review для запуска контейнера, clear_review для удаления контенера.
+[Ссылка](https://devops-team-otus.slack.com/archives/C03706PRZU6) на канал в Slack
 
 ### Лекция 22
 #### 22.1 Мониторинг с Prometheus
@@ -128,3 +236,44 @@ for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done
 Добален мониторинг БД с помощью percona/mongodb_exporter.
 Добален мониторинг Blackbox.
 Создан Makefile для сборки и отправки образов.
+
+### Лекция 25
+#### 25.1 Сбор логов из Docker-контейнеров в EFK
+Для сборов логов из Docker-контейнеров используется стек Elasticsearch-Fluentd-Kibana (EFK)
+Стек запускается через docker-compose `docker/docker-compose-logging.yml`. Конетейнер с конфигурацией Fluentd собирается из Dockerfile в `logging/fluentd`.
+Сборка конейнеров приложений:
+```
+export USER_NAME='логин на Docker Hub'
+cd ./src/ui && bash docker_build.sh && docker push $USER_NAME/ui
+cd ../post-py && bash docker_build.sh && docker push $USER_NAME/post
+cd ../comment && bash docker_build.sh && docker push $USER_NAME/comment
+```
+Запуск EFK и приложения (выставить переменные среды в .env):
+```
+cd logging/fluentd/
+docker build -t $USER_NAME/fluentd .
+cd ../../docker/
+docker-compose -f docker-compose-logging.yml up -d
+docker-compose -f docker-compose.yml up -d
+```
+В конфигурацию Fluentd добавлены фильтры для структурированных логов приложения `post` и фильтры с grok для неструктурированных логов приложения `ui`. Использовался обновленный сиснтаксис плагина [fluent-plugin-grok-parser](https://github.com/fluent/fluent-plugin-grok-parser)
+В docker-compose приложения добавлены environment переменные.
+#### 25.2 Сбор трейсов с Zipkin
+Для сбора трейсов добавляем контейнер zipkin в `docker/docker-compose-logging.yml`, отправка трейсов в приложениях включается env-переменной ZIPKIN_ENABLED. Добавляем сети приложений в `docker/docker-compose-logging.yml` для доступа приложений к конетенеру.
+#### 25.3 Задание со *
+Фильтр неструктурированных логов приложения `ui`:
+```
+<filter service.ui>
+  @type parser
+  key_name message
+  format grok
+  <parse>
+    @type grok
+    <grok>
+      pattern service=%{WORD:service} \| event=%{WORD:event} \| path=%{URIPATHPARAM:request} \| request_id=%{GREEDYDATA:request_id} \| remote_addr=%{IP:client} \| method=.%{WORD:method} \| response_status=%{NUMBER:response_status}
+    </grok>
+  </parse>
+  reserve_data true
+</filter>
+```
+Собраны контейнеры с тегом bug. Аннализ трейсов в Zipkin показал, что большая задержка в 3 сек. происходит при обращении к сервису `post` span `db_find_single_post`. В коде функции find_post есть задержка исполнения time.sleep(3).
