@@ -112,3 +112,19 @@ git commit -am '#4 add logout button to profile page'
 git tag 2.4.10
 git push gitlab gitlab-ci-1 --tags
 ```
+
+
+### Лекция 22
+#### 22.1 Мониторинг с Prometheus
+Созданы Dockerfile и конфигурация Prometheus.
+Команда для сборки всех образов приложений:
+```
+export USER_NAME=username
+for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done
+```
+Отредактирован файл docker-compose.yml для запуска контейненеров с Prometheus. Убраны команды build, Добавлены network aliases.
+Контейнеры загружены в [DockerHub](https://hub.docker.com/u/ayden1st).
+#### 22.2 Задания со *
+Добален мониторинг БД с помощью percona/mongodb_exporter.
+Добален мониторинг Blackbox.
+Создан Makefile для сборки и отправки образов.
