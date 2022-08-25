@@ -1,0 +1,5 @@
+cloud_id                 = "11111111111111111111"
+folder_id                = "11111111111111111111"
+zone                     = "ru-central1-a"
+public_key_path          = "~/.ssh/ubuntu.pub"
+service_account_key_file = "key_tf.json"

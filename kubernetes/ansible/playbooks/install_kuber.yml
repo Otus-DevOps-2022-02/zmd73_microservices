@@ -1,0 +1,35 @@
+---
+- name: Master node
+  hosts: k8s_master
+  become: true
+  vars:
+    kubernetes_version: '1.19'
+    kubernetes_role: 'master'
+    kubernetes_pod_network:
+      cni: 'calico'
+      cidr: '10.244.0.0/16'
+    kubernetes_calico_manifest_file: https://docs.projectcalico.org/v3.20/manifests/calico.yaml
+    kubernetes_config_cluster_configuration:
+      networking:
+        podSubnet: "{{ kubernetes_pod_network.cidr }}"
+      kubernetesVersion: "{{ kubernetes_version_kubeadm }}"
+      apiServer:
+        certSANs:
+          - "{{ansible_default_ipv4.address}}"
+          - "{{ansible_host}}"
+      controlPlaneEndpoint: "{{ansible_host}}"
+  roles:
+    - geerlingguy.kubernetes
+
+- name: Worker node
+  hosts: k8s_worker
+  become: true
+  vars:
+    kubernetes_version: '1.19'
+    kubernetes_role: 'node'
+    kubernetes_pod_network:
+      cni: 'calico'
+      cidr: '10.244.0.0/16'
+    kubernetes_calico_manifest_file: https://docs.projectcalico.org/v3.20/manifests/calico.yaml
+  roles:
+    - geerlingguy.kubernetes
