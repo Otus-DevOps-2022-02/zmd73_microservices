@@ -425,3 +425,53 @@ kubectl proxy
 kubectl -n kubernetes-dashboard delete serviceaccount admin-user
 kubectl -n kubernetes-dashboard delete clusterrolebinding admin-user
 ```
+
+### Лекция 31
+#### 31.1 Ingress
+Остановка kube-dns:
+```
+kubectl scale deployment --replicas 0 -n kube-system kube-dns-autoscaler
+kubectl scale deployment --replicas 0 -n kube-system kube-dns
+```
+Запуск kube-dns:
+```
+kubectl scale deployment --replicas 1 -n kube-system kube-dns-autoscaler
+```
+Установка последней версии ingress в kubernetes:
+```
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.2.1/deploy/static/provider/cloud/deploy.yaml
+```
+Применение манифеста ingress для сервиса ui:
+```
+kubectl apply -f kubernetes/reddit/ui-ingress.yml -n dev
+```
+Узнать адрес ingress:
+```
+kubectl get ingress -n dev
+```
+#### 31.2 Secret
+Создание самоподписанного сертификата:
+```
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=<ingress_external_ip"
+```
+Манифесты для секрета сертификата и ingress находятся в папке `kubernetes/reddit`.
+#### 31.3 Network Policy
+Применение манифеста network-policy:
+```
+kubectl apply -f kubernetes/reddit/mongo-network-policy.yml -n dev
+```
+#### 31.4 Volume
+Создание диска в Yandex Cloud:
+```
+yc compute disk create \
+  --name k8s \
+  --size 4 \
+  --description "disk for k8s"
+```
+* Объем диска Persistent Volume и Persistent Volume Claims должен или совпадать или PVC должен быть меньше PV
+* Имя в pvc ( volumeName: mongo-pv) должно совпадать с именем pv
+Применение манифестов для PV и PVC:
+```
+kubectl apply -f kubernetes/reddit/mongo-volume.yml -n dev
+kubectl apply -f kubernetes/reddit/mongo-claim.yml -n dev
+```
