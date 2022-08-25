@@ -400,7 +400,7 @@ kubectl apply -f ./kubernetes/reddit/ -n dev
 kubectl get nodes -o wide
 kubectl describe service ui -n dev | grep NodePort
 ```
-![Yandex Cloud Managed K8S Pods](images/yc-k8s-pods1.png)
+![Yandex Cloud Managed K8S Pods](images/yc-k8s-node1.png)
 ![Node1 ui app](images/yc-k8s-node2.png)
 #### 30.3 Задание со *
 [Зеркало документации](https://registry.tfpla.net/providers/yandex-cloud/yandex/latest/docs/resources/kubernetes_cluster) по провайдеру Yandex Cloud.
