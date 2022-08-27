@@ -1,3 +1,5 @@
+# zmd73_microservices
+
 ### Лекция 15
 #### 15.1 Работа с контейнерами
 Создание и запуск контейнера:
@@ -351,4 +353,75 @@ kubectl get pods -w
 Установку можно запустить командой из корня репозитория:
 ```
 make install_k8s
+```
+### Лекция 30
+#### 30.1 Minikube, context
+Запуск minikube с драйвером virtualbox:
+```
+minikube start --driver=virtualbox
+```
+*Context* конфигурация для подключения к кластеру Kubernetes, расположен в `~/.kube/config.
+Задать *context*:
+```
+kubectl config set-cluster ... cluster_name
+kubectl config set-credentials ... user_name
+kubectl config set-context context_name \
+  --cluster=cluster_name \
+  --user=user_name
+```
+Выбрать *context*:
+```
+kubectl config use-context context_name
+```
+Текущий *context*:
+```
+kubectl config current-context
+```
+Все имеющиеся *context*:
+```
+kubectl config get-contexts
+```
+Включить и открыть dashboard в minikube:
+```
+minikube dashboard
+```
+#### 30.2 Yandex Cloud Managed Sevice for Kubernetes
+Получить *context* кластера Managed Kubernetes в Yandex Cloud:
+```
+yc managed-kubernetes cluster get-credentials <cluster-name> --external
+```
+Запуск манифестов:
+```
+kubectl apply -f ./kubernetes/reddit/dev-namespace.yml
+kubectl apply -f ./kubernetes/reddit/ -n dev
+```
+Узнать адреса нод и порт сервиса приложения:
+```
+kubectl get nodes -o wide
+kubectl describe service ui -n dev | grep NodePort
+```
+![Yandex Cloud Managed K8S Pods](images/yc-k8s-node1.png)
+![Node1 ui app](images/yc-k8s-node2.png)
+#### 30.3 Задание со *
+[Зеркало документации](https://registry.tfpla.net/providers/yandex-cloud/yandex/latest/docs/resources/kubernetes_cluster) по провайдеру Yandex Cloud.
+В директории 'kubernetes/terraform_yc_mk8s' манифест для развертывания кластера Managed Service for Kubernetes в Yandex Cloud.
+Запуск:
+```
+make install_yc_mk8s
+```
+[Документация](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/) по установке дашборда в кластер Kubernetes.
+Применение манифестов, создание токена, запуск proxy:
+```
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.5.0/aio/deploy/recommended.yaml
+kubectl apply -f ./kubernetes/dashboard/admin-user.yml
+kubectl apply -f ./kubernetes/dashboard/cluster-role.yml
+kubectl -n kubernetes-dashboard create token admin-user
+kubectl proxy
+```
+Перейти по [ссылке](http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/) и зайти по полученному токену.
+> **WARNING**: Пользователь с правами admin.
+Удаление:
+```
+kubectl -n kubernetes-dashboard delete serviceaccount admin-user
+kubectl -n kubernetes-dashboard delete clusterrolebinding admin-user
 ```
