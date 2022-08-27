@@ -1,0 +1,5 @@
+---
+- src: geerlingguy.docker
+  version: 4.2.2
+- src: geerlingguy.kubernetes
+  version: 7.1.1

@@ -1,5 +1,3 @@
-# ayden1st_microservices
-
 ### Лекция 15
 #### 15.1 Работа с контейнерами
 Создание и запуск контейнера:
@@ -259,7 +257,7 @@ docker-compose -f docker-compose.yml up -d
 В конфигурацию Fluentd добавлены фильтры для структурированных логов приложения `post` и фильтры с grok для неструктурированных логов приложения `ui`. Использовался обновленный сиснтаксис плагина [fluent-plugin-grok-parser](https://github.com/fluent/fluent-plugin-grok-parser)
 В docker-compose приложения добавлены environment переменные.
 #### 25.2 Сбор трейсов с Zipkin
-Для сбора трейсов добавляем контейнер zipkin в `docker/docker-compose-logging.yml`, отправка трейсов в приложениях включается env-переменной ZIPKIN_ENABLED. Добавляем сети приложений в `docker/docker-compose-logging.yml` для доступа приложений к конетенеру.
+Для сбора трейсов добавляем контейнер zipkin в `docker/docker-compose-logging.yml`, отправка трейсов в приложениях включается env-переменной ZIPKIN_ENABLED. Добавляем сети приложений в `docker/docker-compose-logging.yml` для доступа приложений к контейнеру.
 #### 25.3 Задание со *
 Фильтр неструктурированных логов приложения `ui`:
 ```
@@ -276,4 +274,81 @@ docker-compose -f docker-compose.yml up -d
   reserve_data true
 </filter>
 ```
-Собраны контейнеры с тегом bug. Аннализ трейсов в Zipkin показал, что большая задержка в 3 сек. происходит при обращении к сервису `post` span `db_find_single_post`. В коде функции find_post есть задержка исполнения time.sleep(3).
+Собраны контейнеры с тегом bug. Анализ трейсов в Zipkin показал, что большая задержка в 3 сек. происходит при обращении к сервису `post` span `db_find_single_post`. В коде функции find_post есть задержка исполнения time.sleep(3).
+
+### Лекция 28
+#### 28.1 Установка k8s на виртуальных машинах
+Установка Docker на ubuntu 18.04:
+```
+sudo apt update && sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+sudo apt update && sudo apt install -y docker-ce=5:19.03.15~3-0~ubuntu-bionic docker-ce-cli=5:19.03.15~3-0~ubuntu-bionic
+```
+Установка k8s на ubuntu 18.04:
+```
+sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl
+sudo curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update && sudo apt install -y kubelet=1.19.16-00 kubeadm=1.19.16-00 kubectl=1.19.16-00
+sudo apt-mark hold kubelet kubeadm kubectl
+```
+Иннициализация мастер-ноды на первом хосте:
+```
+sudo kubeadm init --apiserver-cert-extra-sans=<external-master-ip> \
+  --apiserver-advertise-address=0.0.0.0 \
+  --control-plane-endpoint=<external-master-ip> \
+  --pod-network-cidr=10.244.0.0/16
+```
+Добавление в кластер воркер-ноды на втором хосте:
+```
+kubeadm join <external-master-ip>:6443 --token <token> \
+    --discovery-token-ca-cert-hash sha256:<cert-hash>
+```
+Для управления кластером через kubectl нужно скопировать `config` с мастер-ноды
+На самом хосте:
+```
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+на удаленном хосте:
+```
+scp ubuntu@<external-master-ip>:~/.kube/config ~/.kube/config
+```
+Инофрмация о нодах можно получить командой:
+```
+kubectl get nodes
+```
+#### 28.2 Установка CNI плагина calico
+Для установки CNI плагина calico нужно применить манифест в k8s.
+[Манифест](https://projectcalico.docs.tigera.io/manifests/calico.yaml) по ссылке из офф [документации](https://projectcalico.docs.tigera.io/getting-started/kubernetes/self-managed-onprem/onpremises#install-calico-with-kubernetes-api-datastore-more-than-50-nodes) при применении вызывает ошибку:
+```
+unable to recognize "calico.yaml": no matches for kind "PodDisruptionBudget" in version "policy/v1"
+```
+Скачаем альтернативную версию манифеста:
+```
+curl https://docs.projectcalico.org/v3.20/manifests/calico.yaml -O
+```
+Раскоменнтируем `CALICO_IPV4POOL_CIDR` и определим `10.244.0.0/16`.
+Применим:
+```
+kubectl apply -f calico.yaml
+```
+Все ноды переходят в READY статус.
+#### 28.3 Применение манифестов приложения reddit
+Применим манифесты всех компонентов reddit
+```
+cd kubernetes/reddit
+kubectl apply -f mongo-deployment.yml
+kubectl apply -f post-deployment.yml
+kubectl apply -f comment-deployment.yml
+kubectl apply -f ui-deployment.yml
+kubectl get pods -w
+```
+#### 28.4 Задание со *
+В директории `terraform` и `ansible` добавлены манифесты и плейбуки для установки кластера.
+Установку можно запустить командой из корня репозитория:
+```
+make install_k8s
+```
